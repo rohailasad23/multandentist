@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Luxury dental clinic website
 
-## Getting Started
+A complete, multi-page website for a dental clinic: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4 and Motion.
 
-First, run the development server:
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
+npm run build && npm start   # production
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Requires Node 18.18+ (20+ recommended).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Before launch
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Clinic details**: edit `src/content/site.ts`. Every `[bracketed]` value is a placeholder and is shown on the site with a dashed outline. Placeholders are automatically left out of search-engine structured data. See `PLACEHOLDERS.md` for the full checklist.
+2. **Treatments**: edit `src/content/treatments.ts`. Set `offered: false` on anything the clinic does not provide; it disappears from navigation, the booking form and the sitemap.
+3. **Photography**: replace the temporary Unsplash images in `src/content/images.ts` with the clinic's own photographs (see `IMAGE_CREDITS.md`).
+4. **Smile gallery**: add genuine, consented patient cases to `cases` in `src/content/gallery.ts`.
+5. **Bookings**: connect a backend (see `BOOKING.md`). Until then the form runs in clearly labelled demo mode.
+6. Set `NEXT_PUBLIC_SITE_URL` to the real domain, and set `showPreviewNotice: false` in `site.ts`.
 
-## Learn More
+## Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/app/                 Routes: /, /about, /dentist, /treatments, /treatments/[slug],
+                         /smile-gallery, /appointment, /contact, /privacy, /credits,
+                         api/appointments, sitemap.xml, robots.txt
+src/content/             All editable copy and clinic data
+src/components/motion/   Reveal, MaskText, ImageReveal, useReduce (reduced-motion aware)
+src/components/sections/ Hero and page sections
+src/components/booking/  Appointment form
+src/components/gallery/  Before/after slider, lightbox, filterable gallery
+src/lib/booking/         Validation schema (shared client/server) and providers
+src/lib/seo.tsx          Page metadata and Dentist JSON-LD
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Motion**: the brand intro plays once per session, is skippable, and is skipped entirely for `prefers-reduced-motion`. No scroll hijacking: native scrolling throughout.
+- **Images** use a custom loader so Unsplash's CDN serves resized, modern-format images. Local images in `/public` pass straight through; if you switch to self-hosted photos, you can remove the custom loader in `next.config.ts` to use Next's built-in optimiser.
+- **Accessibility**: skip link, semantic landmarks, keyboard-operable menu (focus trap + Escape), accessible accordion, lightbox and before/after slider (native range input), labelled form fields with an error summary.
