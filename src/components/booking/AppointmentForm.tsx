@@ -11,13 +11,13 @@ import { site, telHref, isPlaceholder } from "@/content/site";
 type Status =
   | { kind: "idle" }
   | { kind: "submitting" }
-  | { kind: "success"; reference: string; mode: string; waUrl?: string }
+  | { kind: "success"; reference: string; mode: string; wa?: { mobile: boolean; web: string; app: string } }
   | { kind: "error"; message: string };
 
 type Values = { name: string; phone: string; email: string; treatment: string; date: string; time: string; message: string; consent: boolean };
 
 /** Builds a WhatsApp link with the request pre-written, for clinics that take bookings on WhatsApp. */
-function whatsappRequestUrl(v: Values, reference: string) {
+function whatsappRequestText(v: Values, reference: string) {
   const treatment = treatmentOptions.find((o) => o.value === v.treatment)?.label ?? v.treatment;
   const time = timeSlots.find((t) => t.value === v.time)?.label ?? v.time;
   const date = new Date(`${v.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -34,7 +34,23 @@ function whatsappRequestUrl(v: Values, reference: string) {
     "",
     `Reference: ${reference}`,
   ];
-  return `https://wa.me/${site.booking.whatsapp}?text=${encodeURIComponent(lines.join("\n"))}`;
+  return encodeURIComponent(lines.join("\n"));
+}
+
+/**
+ * Phones: wa.me hands straight over to the WhatsApp app.
+ * Computers: wa.me shows an intermediate "Continue to chat" page that is easy
+ * to mistake for a sent message, so go directly to WhatsApp Web instead, and
+ * offer the desktop app as an alternative.
+ */
+function whatsappLinks(text: string) {
+  const n = site.booking.whatsapp;
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  return {
+    mobile,
+    web: mobile ? `https://wa.me/${n}?text=${text}` : `https://web.whatsapp.com/send?phone=${n}&text=${text}`,
+    app: `whatsapp://send?phone=${n}&text=${text}`,
+  };
 }
 
 const fieldOrder: (keyof Values)[] = ["name", "phone", "email", "treatment", "date", "time", "message", "consent"];
@@ -131,9 +147,9 @@ export function AppointmentForm({ defaultTreatment = "" }: { defaultTreatment?: 
       // Open WhatsApp within the click itself so mobile browsers don't block it.
       if (honeypot.current?.value) return;
       const reference = `REQ-${Date.now().toString(36).slice(-6).toUpperCase()}`;
-      const waUrl = whatsappRequestUrl(values, reference);
-      window.open(waUrl, "_blank", "noopener");
-      setStatus({ kind: "success", reference, mode: "whatsapp", waUrl });
+      const wa = whatsappLinks(whatsappRequestText(values, reference));
+      window.open(wa.web, "_blank", "noopener");
+      setStatus({ kind: "success", reference, mode: "whatsapp", wa });
       return;
     }
     setStatus({ kind: "submitting" });
@@ -177,21 +193,32 @@ export function AppointmentForm({ defaultTreatment = "" }: { defaultTreatment?: 
         <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-full bg-forest text-paper">
           <svg viewBox="0 0 24 24" className="h-6 w-6"><motion.path d="M5 12.5 10 17 19 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.8, delay: 0.3, ease: easeLux }} /></svg>
         </span>
-        <h2 className="display-md mt-8">{status.waUrl ? "Almost done" : "Thank you"}, {values.name.split(" ")[0]}.</h2>
-        {status.waUrl ? (
+        <h2 className="display-md mt-8">{status.wa ? "One last step" : "Thank you"}, {values.name.split(" ")[0]}.</h2>
+        {status.wa ? (
           <>
             <p className="lede mt-6 max-w-lg text-ink-soft">
-              WhatsApp has opened with your request already written. <strong className="font-semibold text-ink">Tap Send in WhatsApp</strong> to deliver it to the clinic. This is not yet a confirmed booking: our team will reply to agree a time.
+              Your request is written and waiting in WhatsApp, but it has <strong className="font-semibold text-ink">not been sent yet</strong>. Please open the chat and press <strong className="font-semibold text-ink">Send</strong> so it reaches the clinic.
             </p>
-            <a
-              href={status.waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-8 inline-flex min-h-12 items-center gap-3 rounded-full bg-[#1f7a4d] px-7 py-3 text-[0.9rem] font-semibold text-paper transition-colors hover:bg-[#17603c]"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3Z" /></svg>
-              WhatsApp didn&apos;t open? Tap here
-            </a>
+            <ol className="mt-6 max-w-lg list-inside list-decimal space-y-1 text-sm leading-relaxed text-ink-soft">
+              {status.wa.mobile ? (
+                <li>WhatsApp should have opened. If it didn&apos;t, tap the green button below.</li>
+              ) : (
+                <li>WhatsApp Web has opened in a new tab. Scan the QR code if asked, or use the WhatsApp app button below.</li>
+              )}
+              <li>Check the message, then press Send.</li>
+              <li>The clinic will reply on WhatsApp to agree a time. This is not yet a confirmed booking.</li>
+            </ol>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href={status.wa.web} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-3 rounded-full bg-[#1f7a4d] px-7 py-3 text-[0.9rem] font-semibold text-paper transition-colors hover:bg-[#17603c]">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3Z" /></svg>
+                {status.wa.mobile ? "Open WhatsApp" : "Open WhatsApp Web"}
+              </a>
+              {!status.wa.mobile && (
+                <a href={status.wa.app} className="inline-flex min-h-12 items-center rounded-full border border-ink/25 px-7 py-3 text-[0.9rem] font-semibold transition-colors hover:border-ink">
+                  Open the WhatsApp app
+                </a>
+              )}
+            </div>
           </>
         ) : (
           <p className="lede mt-6 max-w-lg text-ink-soft">
