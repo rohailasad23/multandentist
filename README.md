@@ -41,3 +41,7 @@ src/lib/seo.tsx          Page metadata and Dentist JSON-LD
 - **Motion**: the brand intro plays once per session, is skippable, and is skipped entirely for `prefers-reduced-motion`. No scroll hijacking: native scrolling throughout.
 - **Images** use a custom loader so Unsplash's CDN serves resized, modern-format images. Local images in `/public` pass straight through; if you switch to self-hosted photos, you can remove the custom loader in `next.config.ts` to use Next's built-in optimiser.
 - **Accessibility**: skip link, semantic landmarks, keyboard-operable menu (focus trap + Escape), accessible accordion, lightbox and before/after slider (native range input), labelled form fields with an error summary.
+
+## Deploy to Netlify
+
+`netlify.toml` is included. In Netlify choose **Add new site → Import an existing project → GitHub**, select this repository and deploy; no extra settings are needed. Afterwards set `NEXT_PUBLIC_SITE_URL` to the site's address under Site configuration → Environment variables and redeploy. Leave `BOOKING_PROVIDER` unset to keep the booking form in demo mode.
