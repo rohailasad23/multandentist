@@ -50,6 +50,15 @@ export const site = {
     facebook: "",
     googleReviews: "",
   },
+  /**
+   * Where appointment requests are delivered. When `whatsapp` is set (digits
+   * only, international format), submitting the form opens WhatsApp with the
+   * request pre-written to this number; the patient taps Send. Leave empty to
+   * use the server-side provider configured in BOOKING.md instead.
+   */
+  booking: {
+    whatsapp: "923139785089",
+  },
   /** Shows a slim notice that bracketed details are placeholders. Turn off at launch. */
   showPreviewNotice: true,
 } as const;

@@ -8,9 +8,34 @@ import { Button } from "@/components/ui/Button";
 import { easeLux } from "@/components/motion/Reveal";
 import { site, telHref, isPlaceholder } from "@/content/site";
 
-type Status = { kind: "idle" } | { kind: "submitting" } | { kind: "success"; reference: string; mode: string } | { kind: "error"; message: string };
+type Status =
+  | { kind: "idle" }
+  | { kind: "submitting" }
+  | { kind: "success"; reference: string; mode: string; waUrl?: string }
+  | { kind: "error"; message: string };
 
 type Values = { name: string; phone: string; email: string; treatment: string; date: string; time: string; message: string; consent: boolean };
+
+/** Builds a WhatsApp link with the request pre-written, for clinics that take bookings on WhatsApp. */
+function whatsappRequestUrl(v: Values, reference: string) {
+  const treatment = treatmentOptions.find((o) => o.value === v.treatment)?.label ?? v.treatment;
+  const time = timeSlots.find((t) => t.value === v.time)?.label ?? v.time;
+  const date = new Date(`${v.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const lines = [
+    "Hello, I would like to request an appointment.",
+    "",
+    `Name: ${v.name}`,
+    `Phone: ${v.phone}`,
+    `Email: ${v.email}`,
+    `Treatment: ${treatment}`,
+    `Preferred date: ${date}`,
+    `Preferred time: ${time}`,
+    ...(v.message.trim() ? [`Message: ${v.message.trim()}`] : []),
+    "",
+    `Reference: ${reference}`,
+  ];
+  return `https://wa.me/${site.booking.whatsapp}?text=${encodeURIComponent(lines.join("\n"))}`;
+}
 
 const fieldOrder: (keyof Values)[] = ["name", "phone", "email", "treatment", "date", "time", "message", "consent"];
 
@@ -102,6 +127,15 @@ export function AppointmentForm({ defaultTreatment = "" }: { defaultTreatment?: 
       requestAnimationFrame(() => summaryRef.current?.focus());
       return;
     }
+    if (site.booking.whatsapp) {
+      // Open WhatsApp within the click itself so mobile browsers don't block it.
+      if (honeypot.current?.value) return;
+      const reference = `REQ-${Date.now().toString(36).slice(-6).toUpperCase()}`;
+      const waUrl = whatsappRequestUrl(values, reference);
+      window.open(waUrl, "_blank", "noopener");
+      setStatus({ kind: "success", reference, mode: "whatsapp", waUrl });
+      return;
+    }
     setStatus({ kind: "submitting" });
     try {
       const res = await fetch("/api/appointments", {
@@ -143,10 +177,27 @@ export function AppointmentForm({ defaultTreatment = "" }: { defaultTreatment?: 
         <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-full bg-forest text-paper">
           <svg viewBox="0 0 24 24" className="h-6 w-6"><motion.path d="M5 12.5 10 17 19 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.8, delay: 0.3, ease: easeLux }} /></svg>
         </span>
-        <h2 className="display-md mt-8">Thank you, {values.name.split(" ")[0]}.</h2>
-        <p className="lede mt-6 max-w-lg text-ink-soft">
-          Your appointment <strong className="font-semibold text-ink">request</strong> has been received. This is not yet a confirmed booking: a member of our team will contact you by phone or email to agree a time.
-        </p>
+        <h2 className="display-md mt-8">{status.waUrl ? "Almost done" : "Thank you"}, {values.name.split(" ")[0]}.</h2>
+        {status.waUrl ? (
+          <>
+            <p className="lede mt-6 max-w-lg text-ink-soft">
+              WhatsApp has opened with your request already written. <strong className="font-semibold text-ink">Tap Send in WhatsApp</strong> to deliver it to the clinic. This is not yet a confirmed booking: our team will reply to agree a time.
+            </p>
+            <a
+              href={status.waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-8 inline-flex min-h-12 items-center gap-3 rounded-full bg-[#1f7a4d] px-7 py-3 text-[0.9rem] font-semibold text-paper transition-colors hover:bg-[#17603c]"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .2-1.2c-.1-.1-.3-.2-.5-.3Z" /></svg>
+              WhatsApp didn&apos;t open? Tap here
+            </a>
+          </>
+        ) : (
+          <p className="lede mt-6 max-w-lg text-ink-soft">
+            Your appointment <strong className="font-semibold text-ink">request</strong> has been received. This is not yet a confirmed booking: a member of our team will contact you by phone or email to agree a time.
+          </p>
+        )}
         <p className="mt-6 text-sm text-ink-soft">Reference: <span className="font-mono text-ink">{status.reference}</span></p>
         {demo && (
           <p className="mt-8 rounded-md border border-dashed border-error/50 bg-error/5 px-4 py-3 text-sm text-error">
@@ -265,7 +316,7 @@ export function AppointmentForm({ defaultTreatment = "" }: { defaultTreatment?: 
 
       <div className="mt-12 flex flex-col gap-6 border-t border-ink/10 pt-10 sm:flex-row sm:items-center sm:justify-between">
         <p className="max-w-sm text-xs leading-relaxed text-ink-soft">
-          Submitting sends a request only. Your appointment is confirmed once our team contacts you. For urgent dental problems, please call{" "}
+          {site.booking.whatsapp ? "Submitting opens WhatsApp with your request ready to send. " : "Submitting sends a request only. "}Your appointment is confirmed once our team contacts you. For urgent dental problems, please call{" "}
           {tel ? <a className="underline" href={tel}>{site.phone}</a> : <span className={isPlaceholder(site.phone) ? "placeholder-chip" : ""}>{site.phone}</span>}.
         </p>
         <Button type="submit" arrow={status.kind !== "submitting"} disabled={status.kind === "submitting"} aria-busy={status.kind === "submitting"} className="min-w-[14rem]">
@@ -275,7 +326,7 @@ export function AppointmentForm({ defaultTreatment = "" }: { defaultTreatment?: 
               Sending request…
             </span>
           ) : (
-            "Request Appointment"
+            site.booking.whatsapp ? "Request via WhatsApp" : "Request Appointment"
           )}
         </Button>
       </div>

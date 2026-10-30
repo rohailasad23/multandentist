@@ -9,6 +9,10 @@ The form at `/appointment` posts to `POST /api/appointments`, which:
 
 Patient details are never put in URLs, never logged, and never stored by the website itself. The site always describes a submission as a **request**, never as a confirmed booking.
 
+## WhatsApp mode (currently active)
+
+`site.booking.whatsapp` in `src/content/site.ts` is set, so submitting the validated form opens WhatsApp with the request pre-written to that number (wa.me link). The patient taps Send in WhatsApp, and the clinic replies there. Nothing passes through the server. To switch to a server-side provider, set `booking.whatsapp` to `""`.
+
 ## Providers
 
 Set `BOOKING_PROVIDER` in your environment (see `.env.example`):
